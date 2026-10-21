@@ -7,7 +7,7 @@
 
 ## Current functionality
 - Local video import, heuristic scene-change detection and basic sharpness ranking.
-- Target duration planning and FFmpeg MP4 export with four quality presets.
+- Target duration planning and FFmpeg MP4 export at 1080p or 4K, with four quality presets.
 - Save and reopen project settings as JSON.
 - Release-page update check inside the app.
 - Aspect ratio and basic color looks.
