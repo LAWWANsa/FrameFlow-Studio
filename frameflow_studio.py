@@ -108,6 +108,9 @@ class App:
         ttk.Label(opts,text="المعالجة").grid(row=2,column=0,sticky="w",pady=5)
         self.look=tk.StringVar(value="طبيعي")
         ttk.Combobox(opts,textvariable=self.look,values=["طبيعي","سينمائي","حيوي"],state="readonly",width=14).grid(row=2,column=1,sticky="w",padx=8)
+        ttk.Label(opts,text="جودة التصدير").grid(row=3,column=0,sticky="w",pady=5)
+        self.quality=tk.StringVar(value="عالية")
+        ttk.Combobox(opts,textvariable=self.quality,values=["أعلى جودة","عالية","متوازنة","حجم أصغر"],state="readonly",width=14).grid(row=3,column=1,sticky="w",padx=8)
         self.log=tk.Text(body,height=8,wrap="word",bg="white",fg="#16324f",relief="flat")
         self.log.pack(fill="both",expand=True,pady=10)
         bottom=ttk.Frame(body); bottom.pack(fill="x")
@@ -126,7 +129,7 @@ class App:
                                           filetypes=[("FrameFlow Project","*.json")],initialfile="FrameFlow_Project.json")
         if not path: return
         data={"app":"FrameFlow Studio","version":VERSION,"media":self.media,"music":self.music,
-              "minutes":self.minutes.get(),"ratio":self.ratio.get(),"audio":self.audio.get(),"look":self.look.get()}
+              "minutes":self.minutes.get(),"ratio":self.ratio.get(),"audio":self.audio.get(),"look":self.look.get(),"quality":self.quality.get()}
         try:
             Path(path).write_text(json.dumps(data,ensure_ascii=False,indent=2),encoding="utf-8")
             self.say("تم حفظ المشروع: "+path)
@@ -145,6 +148,7 @@ class App:
             self.ratio.set(data.get("ratio","الأصلية"))
             self.audio.set(data.get("audio","خفض مع الموسيقى"))
             self.look.set(data.get("look","طبيعي"))
+            self.quality.set(data.get("quality","عالية"))
             self.say("تم فتح المشروع. الملفات المفقودة تم تجاهلها.")
         except Exception as e: messagebox.showerror("فتح المشروع",str(e))
 
@@ -258,9 +262,10 @@ class App:
                     audio_map=["-map","1:a:0"]
                 else:
                     audio_map=["-map","0:a:0"]
+                crf={"أعلى جودة":"17","عالية":"20","متوازنة":"23","حجم أصغر":"27"}.get(self.quality.get(),"20")
                 cmd += ["-t",str(item["take"]),"-vf",",".join(vf),"-r","30",
                         "-map","0:v:0",*audio_map,"-c:v","libx264","-preset","veryfast",
-                        "-crf","20","-pix_fmt","yuv420p","-c:a","aac","-ar","48000",
+                        "-crf",crf,"-pix_fmt","yuv420p","-c:a","aac","-ar","48000",
                         "-ac","2","-b:a","160k","-shortest",str(seg)]
                 p=run(cmd)
                 if p.returncode: raise RuntimeError("فشل تجهيز مقطع: "+Path(item["path"]).name+"\n"+p.stderr[-1200:])
