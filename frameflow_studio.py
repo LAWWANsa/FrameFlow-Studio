@@ -56,6 +56,13 @@ def detect_scenes(path, duration, cap_scenes=250):
         return [(i*duration/count, (i+1)*duration/count, 0.0) for i in range(count)], False
     cap = cv2.VideoCapture(str(path))
     if not cap.isOpened(): return [(0, duration, 0.0)], True
+    face_detector = None
+    try:
+        cascade_path = str(Path(cv2.data.haarcascades) / "haarcascade_frontalface_default.xml")
+        detector = cv2.CascadeClassifier(cascade_path)
+        if not detector.empty(): face_detector = detector
+    except Exception:
+        face_detector = None
     fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
     total = cap.get(cv2.CAP_PROP_FRAME_COUNT) or duration*fps
     # sample about twice per second; compare grayscale thumbnails
@@ -69,6 +76,14 @@ def detect_scenes(path, duration, cap_scenes=250):
         small = cv2.resize(frame, (160, 90))
         gray = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY)
         sharp = float(cv2.Laplacian(gray, cv2.CV_64F).var())
+        # Lightweight face-presence bonus helps favor people-focused shots;
+        # it does not identify individuals or distinguish the couple.
+        if face_detector is not None:
+            try:
+                faces = face_detector.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=4, minSize=(18,18))
+                sharp += min(len(faces), 3) * 15.0
+            except Exception:
+                pass
         score = 0.0 if prev is None else float(np.mean(cv2.absdiff(gray, prev)))
         points.append((idx/fps, score, sharp))
         prev = gray
