@@ -202,7 +202,7 @@ class App:
             webbrowser.open(url)
 
     def add_media(self):
-        files=filedialog.askopenfilenames(title="اختر ملفات الفيديو",filetypes=[("Video","*.mp4 *.mov *.mkv *.avi *.m4v *.webm"),("All files","*.*")])
+        files=filedialog.askopenfilenames(title="اختر الفيديوهات والصور",filetypes=[("Video and photos","*.mp4 *.mov *.mkv *.avi *.m4v *.webm *.jpg *.jpeg *.png *.bmp *.webp"),("Video","*.mp4 *.mov *.mkv *.avi *.m4v *.webm"),("Photos","*.jpg *.jpeg *.png *.bmp *.webp"),("All files","*.*")])
         for f in files:
             if f not in self.media:
                 self.media.append(f); self.list.insert("end",Path(f).name)
@@ -237,12 +237,19 @@ class App:
             work.mkdir(parents=True,exist_ok=True)
             self.ui(self.say,"بدء تحليل المقاطع محليًا...")
             assets=[]; total_duration=0
+            image_exts={".jpg",".jpeg",".png",".bmp",".webp"}
             for i,path in enumerate(self.media):
-                d=probe(ff,path); total_duration+=d
-                scenes,cvok=detect_scenes(path,d)
-                self.ui(self.say,f"{Path(path).name}: {len(scenes)} مقطع/مشهد مرشح.")
+                is_photo=Path(path).suffix.lower() in image_exts
+                if is_photo:
+                    d=5.0
+                    scenes=[(0.0,d,1.0)]
+                else:
+                    d=probe(ff,path)
+                    scenes,cvok=detect_scenes(path,d)
+                total_duration+=d
+                self.ui(self.say,f"{Path(path).name}: {'صورة ثابتة (5 ثوانٍ)' if is_photo else str(len(scenes))+' مقطع/مشهد مرشح'}")
                 for a,b,sharp in scenes:
-                    if b-a>=1.0: assets.append({"path":path,"start":a,"end":b,"dur":b-a,"sharp":sharp})
+                    if b-a>=1.0: assets.append({"path":path,"start":a,"end":b,"dur":b-a,"sharp":sharp,"is_photo":is_photo})
                 self.ui(self.progress.configure, value=5+int(15*(i+1)/len(self.media)))
             if not assets: raise RuntimeError("لم أجد مقاطع قابلة للاستخدام.")
             # Prefer sharper scenes, while keeping source chronology as a tie-breaker.
@@ -277,16 +284,21 @@ class App:
                 mode=self.audio.get()
                 # Normalize every segment to a consistent stereo audio stream so concat works
                 # even when some source clips have no audio.
-                pr=run([find_ffprobe(ff),
-                        "-v","error","-select_streams","a:0","-show_entries","stream=codec_type",
-                        "-of","csv=p=0",item["path"]])
-                has_audio=(pr.returncode==0 and bool(pr.stdout.strip()))
-                cmd=[ff,"-y","-ss",str(item["start"]),"-i",item["path"]]
-                if mode=="كتم الصوت الأصلي" or not has_audio:
-                    cmd += ["-f","lavfi","-t",str(item["take"]),"-i","anullsrc=channel_layout=stereo:sample_rate=48000"]
+                if item.get("is_photo"):
+                    cmd=[ff,"-y","-loop","1","-framerate","30","-i",item["path"],
+                         "-f","lavfi","-t",str(item["take"]),"-i","anullsrc=channel_layout=stereo:sample_rate=48000"]
                     audio_map=["-map","1:a:0"]
                 else:
-                    audio_map=["-map","0:a:0"]
+                    pr=run([find_ffprobe(ff),
+                            "-v","error","-select_streams","a:0","-show_entries","stream=codec_type",
+                            "-of","csv=p=0",item["path"]])
+                    has_audio=(pr.returncode==0 and bool(pr.stdout.strip()))
+                    cmd=[ff,"-y","-ss",str(item["start"]),"-i",item["path"]]
+                    if mode=="كتم الصوت الأصلي" or not has_audio:
+                        cmd += ["-f","lavfi","-t",str(item["take"]),"-i","anullsrc=channel_layout=stereo:sample_rate=48000"]
+                        audio_map=["-map","1:a:0"]
+                    else:
+                        audio_map=["-map","0:a:0"]
                 crf={"أعلى جودة":"17","عالية":"20","متوازنة":"23","حجم أصغر":"27"}.get(self.quality.get(),"20")
                 cmd += ["-t",str(item["take"]),"-vf",",".join(vf),"-r","30",
                         "-map","0:v:0",*audio_map,"-c:v","libx264","-preset","veryfast",
