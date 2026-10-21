@@ -22,16 +22,27 @@ jobs:
         run: python -m py_compile frameflow_studio.py
       - name: Build executable
         run: pyinstaller --noconfirm --clean --onefile --windowed --name FrameFlowStudio frameflow_studio.py
+      - name: Download FFmpeg tools
+        shell: pwsh
+        run: |
+          $archive = "$env:RUNNER_TEMP/ffmpeg.zip"
+          Invoke-WebRequest -Uri "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip" -OutFile $archive
+          Expand-Archive -Path $archive -DestinationPath "$env:RUNNER_TEMP/ffmpeg" -Force
+          $ffmpeg = Get-ChildItem "$env:RUNNER_TEMP/ffmpeg" -Recurse -Filter ffmpeg.exe | Select-Object -First 1
+          $ffprobe = Get-ChildItem "$env:RUNNER_TEMP/ffmpeg" -Recurse -Filter ffprobe.exe | Select-Object -First 1
+          if (!$ffmpeg -or !$ffprobe) { throw "FFmpeg/FFprobe binaries were not found in the downloaded archive." }
+          New-Item -ItemType Directory -Force -Path package/tools | Out-Null
+          Copy-Item $ffmpeg.FullName package/tools/ffmpeg.exe
+          Copy-Item $ffprobe.FullName package/tools/ffprobe.exe
       - name: Package app and setup notes
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path package/tools | Out-Null
           Copy-Item dist/FrameFlowStudio.exe package/
           Copy-Item README.md package/README.md
           @'
           FrameFlow Studio — Windows 11 prototype
-          Requires FFmpeg and ffprobe installed and available on PATH.
-          This build uses local media processing. See README.md for current limitations.
+          FFmpeg and FFprobe are bundled in the tools folder. Processing runs locally on this PC.
+          See README.md for current limitations and testing guidance. FFmpeg is GPL-licensed; see the FFmpeg project licensing information.
           '@ | Set-Content package/INSTALL.txt
           Compress-Archive -Path package/* -DestinationPath FrameFlowStudio-Windows.zip
       - uses: actions/upload-artifact@v4
