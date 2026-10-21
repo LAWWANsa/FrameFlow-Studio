@@ -1,22 +1,18 @@
-# FrameFlow Studio
+# FrameFlow Studio — Windows 11 prototype
 
-Free, local-first video editing assistant for Windows 11, built for event and wedding footage.
+## Run
+1. Install Python 3.11+ from https://www.python.org/downloads/windows/ and enable "Add Python to PATH".
+2. Install FFmpeg (including ffprobe) and add its `bin` folder to PATH.
+3. Run `START_FRAMEFLOW.bat`. The launcher installs Python dependencies.
 
-## Principles
-- Media stays on the user's computer; no cloud upload of footage or photos.
-- No paid APIs or subscriptions.
-- Open-source/local processing components only.
-- Be honest about feature status: this repository is under active development and is not yet a complete editor.
+## Working in this milestone
+- Local video import and target duration.
+- Local scene-boundary candidates using OpenCV frame differences.
+- Candidate ranking by a basic sharpness heuristic and chronological assembly.
+- FFmpeg MP4 export, basic aspect ratio/color options, optional background music.
+- Source files are not deleted and media is not uploaded.
 
-## Planned milestones
-1. Stable Windows desktop shell and project settings.
-2. Local media probing and scene-boundary analysis.
-3. Non-random highlight/shot selection with target-duration planning.
-4. Local FFmpeg rendering, music/audio controls, aspect ratios and export presets.
-5. Photo motion, logo overlay, color looks and reusable presets.
-6. Optional local face/highlight models, subject priority, and short-form exports.
-7. Versioned releases and a safe update checker.
-
-## Development
-Python 3.11+ is recommended. See `requirements.txt` and `docs/ROADMAP.md`.
-The initial milestone must be tested on real sample footage before it is described as production-ready.
+## Important limitations
+This is an early functional prototype, not a finished professional editor. The current renderer strips source audio from segments; when a music file is supplied it adds that music, otherwise the output is silent. Original-audio preservation/mixing must be implemented and tested next.
+Scene detection and sharpness ranking are heuristics, not semantic understanding of wedding events. Face tracking, event recognition, photo motion, transitions, logo overlays, batch projects, update service and installer are not implemented yet.
+Test on copies before using for paid client work.
