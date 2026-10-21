@@ -1,4 +1,4 @@
-import os, sys, json, shutil, subprocess, threading, time
+import os, sys, json, shutil, subprocess, threading, time, urllib.request, webbrowser
 from pathlib import Path
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
@@ -90,6 +90,9 @@ class App:
         ttk.Button(bar,text="إضافة فيديوهات",command=self.add_media).pack(side="left")
         ttk.Button(bar,text="إزالة المحدد",command=self.remove_selected).pack(side="left",padx=6)
         ttk.Button(bar,text="اختيار موسيقى",command=self.pick_music).pack(side="left")
+        ttk.Button(bar,text="حفظ مشروع",command=self.save_project).pack(side="left",padx=6)
+        ttk.Button(bar,text="فتح مشروع",command=self.load_project).pack(side="left")
+        ttk.Button(bar,text="فحص التحديثات",command=self.check_updates).pack(side="right")
         self.list=tk.Listbox(body,height=8,selectmode=tk.EXTENDED,bg="white",fg="#16324f",relief="flat")
         self.list.pack(fill="x",pady=(0,12))
         opts=ttk.Frame(body); opts.pack(fill="x")
@@ -117,6 +120,60 @@ class App:
 
     def say(self,msg):
         self.log.insert("end",msg+"\n"); self.log.see("end")
+
+    def save_project(self):
+        path=filedialog.asksaveasfilename(title="حفظ إعدادات المشروع",defaultextension=".json",
+                                          filetypes=[("FrameFlow Project","*.json")],initialfile="FrameFlow_Project.json")
+        if not path: return
+        data={"app":"FrameFlow Studio","version":VERSION,"media":self.media,"music":self.music,
+              "minutes":self.minutes.get(),"ratio":self.ratio.get(),"audio":self.audio.get(),"look":self.look.get()}
+        try:
+            Path(path).write_text(json.dumps(data,ensure_ascii=False,indent=2),encoding="utf-8")
+            self.say("تم حفظ المشروع: "+path)
+        except Exception as e: messagebox.showerror("حفظ المشروع",str(e))
+
+    def load_project(self):
+        path=filedialog.askopenfilename(title="فتح مشروع",filetypes=[("FrameFlow Project","*.json")])
+        if not path: return
+        try:
+            data=json.loads(Path(path).read_text(encoding="utf-8"))
+            self.media=[p for p in data.get("media",[]) if Path(p).exists()]
+            self.list.delete(0,"end")
+            for p in self.media: self.list.insert("end",Path(p).name)
+            self.music=data.get("music","") if Path(data.get("music","")).exists() else ""
+            self.minutes.set(str(data.get("minutes","5")))
+            self.ratio.set(data.get("ratio","الأصلية"))
+            self.audio.set(data.get("audio","خفض مع الموسيقى"))
+            self.look.set(data.get("look","طبيعي"))
+            self.say("تم فتح المشروع. الملفات المفقودة تم تجاهلها.")
+        except Exception as e: messagebox.showerror("فتح المشروع",str(e))
+
+    def check_updates(self):
+        self.status.configure(text="جارٍ فحص التحديثات...")
+        def worker():
+            try:
+                req=urllib.request.Request("https://api.github.com/repos/LAWWANsa/FrameFlow-Studio/releases/latest",
+                                           headers={"User-Agent":"FrameFlow-Studio","Accept":"application/vnd.github+json"})
+                with urllib.request.urlopen(req,timeout=8) as resp: data=json.loads(resp.read().decode("utf-8"))
+                tag=data.get("tag_name","")
+                url=data.get("html_url","https://github.com/LAWWANsa/FrameFlow-Studio/releases")
+                if not tag:
+                    self.ui(self.status.configure,text="لا توجد إصدارات منشورة بعد")
+                    self.ui(lambda:messagebox.showinfo("التحديثات","لا توجد إصدارات رسمية منشورة حتى الآن."))
+                elif tag.lstrip("v") != VERSION.lstrip("v"):
+                    self.ui(self.status.configure,text="يتوفر إصدار منشور")
+                    self.ui(lambda:self.open_update_page(url,tag))
+                else:
+                    self.ui(self.status.configure,text="أنت تستخدم أحدث إصدار منشور")
+                    self.ui(lambda:messagebox.showinfo("التحديثات","لا يوجد إصدار أحدث منشور."))
+            except Exception as e:
+                self.ui(self.status.configure,text="تعذر فحص التحديثات")
+                self.ui(lambda:messagebox.showwarning("التحديثات","تعذر الاتصال بمستودع الإصدارات. تحقق من الإنترنت."))
+        threading.Thread(target=worker,daemon=True).start()
+
+    def open_update_page(self,url,tag):
+        if messagebox.askyesno("تحديث متاح",f"يتوفر الإصدار {tag}. هل تريد فتح صفحة الإصدار؟"):
+            webbrowser.open(url)
 
     def add_media(self):
         files=filedialog.askopenfilenames(title="اختر ملفات الفيديو",filetypes=[("Video","*.mp4 *.mov *.mkv *.avi *.m4v *.webm"),("All files","*.*")])
