@@ -4,7 +4,7 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 
 APP_NAME = "FrameFlow Studio"
-VERSION = "0.2.0"
+VERSION = "0.3.0"
 
 def find_ffmpeg():
     p = shutil.which("ffmpeg")
