@@ -6,21 +6,39 @@ from tkinter import ttk, filedialog, messagebox
 APP_NAME = "FrameFlow Studio"
 VERSION = "0.3.0"
 
+def app_dir():
+    # PyInstaller --onefile extracts __file__ into a temporary folder;
+    # bundled tools live beside the executable instead.
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).resolve().parent
+
 def find_ffmpeg():
     p = shutil.which("ffmpeg")
     if p: return p
     candidates = [
+        app_dir() / "tools" / "ffmpeg.exe",
         Path(__file__).parent / "tools" / "ffmpeg.exe",
         Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "ffmpeg" / "bin" / "ffmpeg.exe",
         Path("C:/ffmpeg/bin/ffmpeg.exe"),
     ]
     return next((str(x) for x in candidates if x.exists()), None)
 
+def find_ffprobe(ffmpeg):
+    candidates = [
+        app_dir() / "tools" / "ffprobe.exe",
+        Path(ffmpeg).with_name("ffprobe.exe"),
+        Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "ffmpeg" / "bin" / "ffprobe.exe",
+        Path("C:/ffmpeg/bin/ffprobe.exe"),
+    ]
+    found = next((str(x) for x in candidates if x.exists()), None)
+    return found or shutil.which("ffprobe") or "ffprobe"
+
 def run(cmd):
     return subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors="replace")
 
 def probe(ffmpeg, path):
-    p = run([ffmpeg.replace("ffmpeg.exe","ffprobe.exe") if ffmpeg.lower().endswith("ffmpeg.exe") else "ffprobe",
+    p = run([find_ffprobe(ffmpeg),
              "-v","error","-show_entries","format=duration","-of","default=noprint_wrappers=1:nokey=1",str(path)])
     if p.returncode != 0:
         # use ffmpeg stderr fallback only to provide a clear error
