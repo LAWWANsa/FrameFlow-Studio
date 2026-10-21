@@ -1,5 +1,7 @@
 # FrameFlow Studio — Windows 11 prototype
 
+Version: 0.6.0
+
 ## Run from source
 1. Install Python 3.11+ and enable "Add Python to PATH".
 2. Install FFmpeg (including ffprobe) and add its `bin` folder to PATH when running from source.
