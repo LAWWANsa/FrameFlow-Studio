@@ -6,7 +6,8 @@
 3. Run `START_FRAMEFLOW.bat`.
 
 ## Current functionality
-- Local video import, heuristic scene-change detection and basic sharpness ranking.
+- Local video and still-photo import; photos become five-second slideshow segments.
+- Heuristic scene-change detection and basic sharpness ranking for videos.
 - Target duration planning and FFmpeg MP4 export at 1080p or 4K, with four quality presets.
 - Save and reopen project settings as JSON.
 - Release-page update check inside the app.
