@@ -4,7 +4,7 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 
 APP_NAME = "FrameFlow Studio"
-VERSION = "0.3.0"
+VERSION = "0.4.0"
 
 def app_dir():
     # PyInstaller --onefile extracts __file__ into a temporary folder;
