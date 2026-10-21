@@ -270,7 +270,7 @@ class App:
                 mode=self.audio.get()
                 # Normalize every segment to a consistent stereo audio stream so concat works
                 # even when some source clips have no audio.
-                pr=run([ff.replace("ffmpeg.exe","ffprobe.exe") if ff.lower().endswith("ffmpeg.exe") else "ffprobe",
+                pr=run([find_ffprobe(ff),
                         "-v","error","-select_streams","a:0","-show_entries","stream=codec_type",
                         "-of","csv=p=0",item["path"]])
                 has_audio=(pr.returncode==0 and bool(pr.stdout.strip()))
