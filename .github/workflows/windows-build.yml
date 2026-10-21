@@ -1,0 +1,41 @@
+name: Windows 11 build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+      - name: Syntax check
+        run: python -m py_compile frameflow_studio.py
+      - name: Build executable
+        run: pyinstaller --noconfirm --clean --onefile --windowed --name FrameFlowStudio frameflow_studio.py
+      - name: Package app and setup notes
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path package/tools | Out-Null
+          Copy-Item dist/FrameFlowStudio.exe package/
+          Copy-Item README.md package/README.md
+          @'
+          FrameFlow Studio — Windows 11 prototype
+          Requires FFmpeg and ffprobe installed and available on PATH.
+          This build uses local media processing. See README.md for current limitations.
+          '@ | Set-Content package/INSTALL.txt
+          Compress-Archive -Path package/* -DestinationPath FrameFlowStudio-Windows.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FrameFlowStudio-Windows
+          path: FrameFlowStudio-Windows.zip
+          if-no-files-found: error
