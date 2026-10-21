@@ -188,7 +188,23 @@ class App:
                 else: vf=["scale='min(1920,iw)':'min(1080,ih)':force_original_aspect_ratio=decrease","pad=ceil(iw/2)*2:ceil(ih/2)*2"]
                 if self.look.get()=="سينمائي": vf += ["eq=contrast=1.08:saturation=0.88"]
                 elif self.look.get()=="حيوي": vf += ["eq=contrast=1.04:saturation=1.15"]
-                cmd=[ff,"-y","-ss",str(item["start"]),"-i",item["path"],"-t",str(item["take"]),"-vf",",".join(vf),"-r","30","-c:v","libx264","-preset","veryfast","-crf","20","-an","-pix_fmt","yuv420p",str(seg)]
+                mode=self.audio.get()
+                # Normalize every segment to a consistent stereo audio stream so concat works
+                # even when some source clips have no audio.
+                pr=run([ff.replace("ffmpeg.exe","ffprobe.exe") if ff.lower().endswith("ffmpeg.exe") else "ffprobe",
+                        "-v","error","-select_streams","a:0","-show_entries","stream=codec_type",
+                        "-of","csv=p=0",item["path"]])
+                has_audio=(pr.returncode==0 and bool(pr.stdout.strip()))
+                cmd=[ff,"-y","-ss",str(item["start"]),"-i",item["path"]]
+                if mode=="كتم الصوت الأصلي" or not has_audio:
+                    cmd += ["-f","lavfi","-t",str(item["take"]),"-i","anullsrc=channel_layout=stereo:sample_rate=48000"]
+                    audio_map=["-map","1:a:0"]
+                else:
+                    audio_map=["-map","0:a:0"]
+                cmd += ["-t",str(item["take"]),"-vf",",".join(vf),"-r","30",
+                        "-map","0:v:0",*audio_map,"-c:v","libx264","-preset","veryfast",
+                        "-crf","20","-pix_fmt","yuv420p","-c:a","aac","-ar","48000",
+                        "-ac","2","-b:a","160k","-shortest",str(seg)]
                 p=run(cmd)
                 if p.returncode: raise RuntimeError("فشل تجهيز مقطع: "+Path(item["path"]).name+"\n"+p.stderr[-1200:])
                 segment_files.append(seg)
@@ -198,21 +214,29 @@ class App:
             silent=work/"joined.mp4"
             p=run([ff,"-y","-f","concat","-safe","0","-i",str(concat),"-c","copy",str(silent)])
             if p.returncode: raise RuntimeError("فشل دمج المقاطع. "+p.stderr[-1200:])
+            mode=self.audio.get()
             if self.music and self.music.lower().endswith((".mp3",".wav",".m4a",".aac",".flac")):
-                mode=self.audio.get()
                 if mode=="كتم الصوت الأصلي":
-                    cmd=[ff,"-y","-i",str(silent),"-stream_loop","-1","-i",self.music,"-t",str(target)," -map","0:v:0","-map","1:a:0","-c:v","copy","-c:a","aac","-b:a","192k","-shortest",str(out)]
-                    cmd=[x for x in cmd if x!=" -map"]
-                    p=run(cmd)
+                    cmd=[ff,"-y","-i",str(silent),"-stream_loop","-1","-i",self.music,
+                         "-map","0:v:0","-map","1:a:0","-c:v","copy","-c:a","aac",
+                         "-b:a","192k","-t",str(target),"-shortest",str(out)]
                 else:
-                    vol="0.18" if mode=="خفض مع الموسيقى" else "0.0"
-                    cmd=[ff,"-y","-i",str(silent),"-stream_loop","-1","-i",self.music,"-filter_complex",f"[1:a]volume=0.22,afade=t=out:st={max(0,target-3)}:d=3[m];[0:a]volume={vol}[o];[o][m]amix=inputs=2:duration=first:dropout_transition=2[a]","-map","0:v:0","-map","[a]","-c:v","copy","-c:a","aac","-b:a","192k","-shortest",str(out)]
-                    # If source clips were rendered without audio, fallback to music-only.
-                    p=run(cmd)
-                    if p.returncode:
-                        p=run([ff,"-y","-i",str(silent),"-stream_loop","-1","-i",self.music,"-map","0:v:0","-map","1:a:0","-c:v","copy","-c:a","aac","-b:a","192k","-t",str(target),str(out)])
+                    # Keep source audio at normal level or duck it under the music.
+                    original_volume="1.0" if mode=="الإبقاء على الصوت الأصلي" else "0.22"
+                    duration=max(1.0,target)
+                    fade_start=max(0.0,duration-3.0)
+                    cmd=[ff,"-y","-i",str(silent),"-stream_loop","-1","-i",self.music,
+                         "-filter_complex",
+                         f"[0:a]volume={original_volume}[orig];[1:a]volume=0.22,afade=t=out:st={fade_start}:d=3[music];[orig][music]amix=inputs=2:duration=first:dropout_transition=2[a]",
+                         "-map","0:v:0","-map","[a]","-c:v","copy","-c:a","aac",
+                         "-b:a","192k","-t",str(target),"-shortest",str(out)]
+                p=run(cmd)
             else:
-                p=run([ff,"-y","-i",str(silent),"-c","copy",str(out)])
+                # Without music, preserve source audio unless the user explicitly muted it.
+                if mode=="كتم الصوت الأصلي":
+                    p=run([ff,"-y","-i",str(silent),"-map","0:v:0","-an","-c:v","copy",str(out)])
+                else:
+                    p=run([ff,"-y","-i",str(silent),"-c","copy",str(out)])
             if p.returncode: raise RuntimeError("فشل التصدير النهائي. "+p.stderr[-1600:])
             self.ui(self.progress.configure,value=100)
             self.ui(self.status.configure,text="اكتمل التصدير")
